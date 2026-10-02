@@ -1,0 +1,16 @@
+[Unit]
+Description=QQQ Trend Following Trading System
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=quant
+WorkingDirectory=/home/quant/quant
+EnvironmentFile=/home/quant/quant/.env
+ExecStart=/home/quant/quant/venv/bin/python /home/quant/quant/QQQ_Trend.py
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

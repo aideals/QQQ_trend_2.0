@@ -1,0 +1,11 @@
+[Unit]
+Description=Run QQQ Trend after US market close
+
+[Timer]
+OnCalendar=Mon..Fri 18:30:00 America/New_York
+Persistent=true
+RandomizedDelaySec=120
+Unit=qqq-trend.service
+
+[Install]
+WantedBy=timers.target
