@@ -1,0 +1,19 @@
+# 虚拟环境
+venv/
+
+# 日志
+logs/
+
+# 行情数据
+market_data/
+
+# 密钥环境文件
+.env
+
+# 图片
+*.png
+
+# python缓存
+__pycache__/
+*.pyc
+
