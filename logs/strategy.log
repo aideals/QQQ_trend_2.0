@@ -1,0 +1,8 @@
+2026-10-04 09:22:12,409 | WARNING | curl_cffi not available; falling back to requests without browser TLS impersonation. Yahoo Finance may rate-limit or block this client. Install curl_cffi (>=0.15) for the supported configuration.
+2026-10-04 09:22:21,372 | ERROR | alpaca-py is not installed. Install requirements.txt.
+2026-10-04 09:22:21,372 | INFO | QQQ Trend V2.1 server start | mode=report | backtest=True | base=/Users/pengliu/Desktop/QQQ_trend
+2026-10-04 09:22:21,372 | INFO | Starting Walk Forward...
+2026-10-04 09:22:22,957 | INFO | Running Monte Carlo...
+2026-10-04 09:22:24,379 | WARNING | Chart generation skipped: No module named 'matplotlib'
+2026-10-04 09:22:24,380 | INFO | Weekend detected; no trading execution.
+2026-10-04 09:22:24,380 | INFO | QQQ Trend V2.1 server finished
