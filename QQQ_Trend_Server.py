@@ -51,6 +51,9 @@ LOG_FOLDER = BASE_DIR / "logs"
 LOG_FOLDER.mkdir(parents=True, exist_ok=True)
 load_dotenv(BASE_DIR / ".env")
 
+# 引入 1% 的过滤带，减少假突破
+BUFFER_PCT = 0.01 
+
 RUN_MODE = os.getenv("RUN_MODE", "report").lower()
 # report = backtest/report only
 # paper  = daily allocation + Alpaca paper execution
@@ -547,7 +550,7 @@ def spy_market_filter(
 
         row["Close"]
         >
-        row["MA200"]
+        row["MA200"] * (1.0 * BUFFER_PCT)
 
     )
 
@@ -583,7 +586,7 @@ def qqq_trend_signal(
 
         row["Close"]
         >
-        row["MA200"]
+        (row["MA200"] * (1.0 + BUFFER_PCT))
 
     )
 
