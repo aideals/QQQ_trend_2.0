@@ -1755,8 +1755,19 @@ def connect_alpaca():
         return None
 
 
-api = connect_alpaca()
-
+#api = connect_alpaca()
+#1. 引入专门的行情数据客户端
+try:
+    from alpaca.data.historical import StockHistoricalDataClient
+    from alpaca.data.requests import StockLatestTradeRequest
+except ImportError:
+    StockHistoricalDataClient = None
+#2. 实例化行情客户端
+    data_client = None
+    if ALPACA_API_KEY and ALPACA_SECRET_KEY and StockHistoricalDataClient:
+        data_client = StockHistoricalDataClient(ALPACA_API_KEY,ALPACA_SECRET_KEY)
+#3. 保持原有的交易客户端连接不变
+    api = connect_alpaca()
 
 
 # ============================================================
@@ -1826,10 +1837,18 @@ def live_rebalance(api, target_symbol, target_weight):
     prices = {}
     for t in ETF_LIST:
         try:
-            trade = api.get_latest_trade(t)
-            prices[t] = float(trade.price)
+            if data_client is not None:
+            #使用最新标准的新价请求方法
+                req = StockLatestTradeRequest(symbol_or_symbols=t)
+                res = data_client.get_stock_latest_trade(req)
+                prices[t] = float(res[t].price)
+            else:
+                 # 如果行情客户端不可用，降级使用本地历史数据的最后一个收盘价作为参考估算值
+                prices[t] = float(market[t]["Close"].iloc[-1])
         except Exception as exc:
-            logger.warning("No Alpaca price for %s: %s", t, exc)
+            logger.warning("No Alpaca price for %s, using fallback: %s", t, exc)
+            # 降级备用兜底逻辑
+            prices[t] = float(market[t]["Close"].iloc[-1])
 
     # Sell every non-target ETF. This intentionally leaves proceeds as cash
     # when target_symbol == BIL, matching the existing strategy's cash behavior.
