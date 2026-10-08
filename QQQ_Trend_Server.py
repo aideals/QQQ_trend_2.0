@@ -1810,6 +1810,14 @@ def submit_market_order(api, symbol, qty, side):
 
 
 def live_rebalance(api, target_symbol, target_weight):
+    # ====== 在函数一开头强制创建全局行情客户端 ======
+    from alpaca.data.historical import StockHistoricalDataClient
+    data_client = StockHistoricalDataClient(os.getenv("ALPACA_API_KEY"), os.getenv("ALPACA_SECRET_KEY"))
+    # =============================================
+    
+    if api is None:
+        logger.warning("Execution skipped: Alpaca unavailable.")
+        return
     if api is None:
         logger.warning("Execution skipped: Alpaca unavailable.")
         return
