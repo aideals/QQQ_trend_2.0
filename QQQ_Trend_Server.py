@@ -1728,6 +1728,7 @@ ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
 ALPACA_PAPER = RUN_MODE != "live"
 
 
+
 def connect_alpaca():
     if not ALPACA_API_KEY or not ALPACA_SECRET_KEY:
         logger.warning("Alpaca credentials not found; execution disabled.")
@@ -1755,7 +1756,7 @@ def connect_alpaca():
         return None
 
 
-#api = connect_alpaca()
+api = connect_alpaca()
 #1. 引入专门的行情数据客户端
 try:
     from alpaca.data.historical import StockHistoricalDataClient
@@ -1766,8 +1767,7 @@ except ImportError:
     data_client = None
     if ALPACA_API_KEY and ALPACA_SECRET_KEY and StockHistoricalDataClient:
         data_client = StockHistoricalDataClient(ALPACA_API_KEY,ALPACA_SECRET_KEY)
-#3. 保持原有的交易客户端连接不变
-    api = connect_alpaca()
+
 
 
 # ============================================================
