@@ -1815,7 +1815,7 @@ def live_rebalance(api, target_symbol, target_weight):
         return
 
     if RUN_MODE == "live" and not ALLOW_LIVE_TRADING:
-        logger.error("LIVE mode requested but ALLOW_LIVE_TRADING != 1. No orders sent.")
+        logger.error("LIVE mode requ`ested but ALLOW_LIVE_TRADING != 1. No orders sent.")
         return
 
     if RUN_MODE not in ("paper", "live"):
