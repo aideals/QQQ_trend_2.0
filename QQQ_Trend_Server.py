@@ -52,10 +52,10 @@ LOG_FOLDER = BASE_DIR / "logs"
 LOG_FOLDER.mkdir(parents=True, exist_ok=True)
 load_dotenv(BASE_DIR / ".env")
 
-# 引入 1% 的过滤带，减少假突破
-BUFFER_PCT = 0.01 
+# 引入 15% 的过滤带，减少假突破
+BUFFER_PCT = 0.015
 
-RUN_MODE = os.getenv("RUN_MODE", "report").lower()
+RUN_MODE = os.getenv("RUN_MODE", "paper").lower()
 # report = backtest/report only
 # paper  = daily allocation + Alpaca paper execution
 # live   = REAL trading (requires explicit opt-in below)
@@ -529,34 +529,25 @@ print(
 # ============================================================
 
 
-def spy_market_filter(
-        date
-):
-
-
+def spy_market_filter(date):
     spy = market["SPY"]
+    if date not in spy.index: return False
+    
+    # 获取 SPY 的当前行和均线
+    row = spy.loc[date]
+    close = row["Close"]
+    ma200 = row["MA200"]
+    
+    # 动态计算上下轨
+    upper_band = ma200 * (1.0 + BUFFER_PCT)
+    lower_band = ma200 * (1.0 - BUFFER_PCT)
+    
+    # 借助外部日志流或默认均线作为基础判断
+    if close > upper_band: return True
+    if close < lower_band: return False
+    return close > ma200 # 区间内降级处理
 
-
-    if date not in spy.index:
-
-        return False
-
-
-
-    row=spy.loc[date]
-
-
-
-    return (
-
-        row["Close"]
-        >
-        row["MA200"] * (1.0 * BUFFER_PCT)
-
-    )
-
-
-
+    
 
 
 # ============================================================
@@ -564,68 +555,39 @@ def spy_market_filter(
 # ============================================================
 
 
-def qqq_trend_signal(
-        date
-):
-
-
-    qqq=market["QQQ"]
-
-
-
-    if date not in qqq.index:
-
+def qqq_trend_signal(date):
+    qqq = market["QQQ"]
+    if date not in qqq.index: return False
+    
+    row = qqq.loc[date]
+    close = row["Close"]
+    ma200 = row["MA200"]
+    
+    upper_band = ma200 * (1.0 + BUFFER_PCT)
+    lower_band = ma200 * (1.0 - BUFFER_PCT)
+    
+    # 1. 计算长线绝对动量开关
+    qqq_momentum = row["Momentum12M"] > 0
+    spy_filter = spy_market_filter(date)
+    
+    # 2. 🌟 核心：均线双轨制缓冲区状态机
+    # 建立一个全局或伪状态追踪。最聪明的做法是看它前 5 天的平均收盘状态，或者直接引入区间滞后：
+    # 如果价格强力突破上轨，绝对安全
+    if close > upper_band and qqq_momentum and spy_filter:
+        return True
+    # If 价格强力跌破下轨，绝对危险
+    if close < lower_band:
         return False
+    
+    # 🚨 关键：如果价格不幸落在 [lower_band, upper_band] 这个尴尬的震荡带里，
+    # 我们通过检查过去 5 天有没有触发过跌破，来维持状态的连贯性，防止天天变信号
+    recent_prices = qqq["Close"].loc[:date].tail(5)
+    if (recent_prices > ma200).mean() >= 0.6:
+        return qqq_momentum and spy_filter
+        
+    return False
 
-
-
-    row=qqq.loc[date]
-
-
-
-    qqq_trend=(
-
-        row["Close"]
-        >
-        (row["MA200"] * (1.0 + BUFFER_PCT))
-
-    )
-
-
-
-    qqq_momentum=(
-
-        row["Momentum12M"]
-        >
-        0
-
-    )
-
-
-
-    spy_filter=(
-        spy_market_filter(date)
-    )
-
-
-
-    return (
-
-        qqq_trend
-
-        and
-
-        qqq_momentum
-
-        and
-
-        spy_filter
-
-    )
-
-
-
-
+  
 
 # ============================================================
 # 8. MULTI ETF MOMENTUM ROTATION
@@ -1670,7 +1632,9 @@ def monte_carlo_test(
 def send_weixin_notification(title, content):
     #"""通过 WxPusher 异步推送微信消息"""
     app_token = os.getenv("WXPUSHER_APP_TOKEN")
+    print(app_token)
     uid = os.getenv("WXPUSHER_UID")
+    print(uid)
     
     if not app_token or not uid:
         logger.warning("微信推送失败：未在 .env 中检测到 WXPUSHER_APP_TOKEN 或 WXPUSHER_UID")
@@ -1923,16 +1887,30 @@ def live_rebalance(api, target_symbol, target_weight):
         target_symbol, target_weight * 100, equity
     )
 
-    wx_title = f"🤖 QQQ Trend 调仓成功通知"
+    # 🌟 升级：智能识别当天到底下了什么单，并写入微信
+    trade_action = "无调仓动作（维持原仓位）"
+    if 'buy_qty' in locals() and buy_qty > 0:
+        trade_action = f" 🟢 【买入 BUY】 {target_symbol} 共 {buy_qty} 股"
+    elif 'sell_qty' in locals() and sell_qty > 0:
+        trade_action = f" 🔴 【卖出 SELL】 {target_symbol} 共 {sell_qty} 股"
+    elif target_symbol == "BIL" and target_weight == 0:
+        trade_action = " ⚪ 【全仓空仓】 转换为 BIL 现金避险"
+
+    wx_title = f"📈 QQQ Trend 每日对账单 ({today})"
     wx_content = (
-        f"**运行日期**: {today}\n\n"
-        f"**当前账户总资产**: ${equity:,.2f} USD\n\n"
-        f"**最新市场决策**: 买入 **{target_symbol}**\n\n"
-        f"**目标配置权重**: {target_weight * 100:.2f}%\n\n"
-        f"**提示**: 请登录 Alpaca 账户后台核对今日具体的订单成交价与滑点。"
+        f"### 🤖 量化策略执行完毕\n\n"
+        f"----------\n"
+        f"* **运行状态**: 实盘调仓成功\n"
+        f"* **当前账户总净值**: `${equity:,.2f} USD`\n"
+        f"* **策略今日核心决策**: **{target_symbol}**\n"
+        f"* **目标风险权重**: `{target_weight * 100:.2f}%`\n"
+        f"----------\n\n"
+        f"### 📊 今日账户实际流水：\n"
+        f"> **{trade_action}**\n\n"
+        f"提示：美股自动化流水线运转正常，请登录 Alpaca 后台核对成交均价。"
     )
     send_weixin_notification(wx_title, wx_content)
-
+    
 
 # ============================================================
 
