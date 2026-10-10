@@ -29,6 +29,7 @@ import sys
 import time
 import warnings
 import logging
+import requests
 from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -1665,7 +1666,39 @@ def monte_carlo_test(
         results
     )
 
+#推送交易策略、订单、交易信息到微信公众号
+def send_weixin_notification(title, content):
+    #"""通过 WxPusher 异步推送微信消息"""
+    app_token = os.getenv("WXPUSHER_APP_TOKEN")
+    uid = os.getenv("WXPUSHER_UID")
+    
+    if not app_token or not uid:
+        logger.warning("微信推送失败：未在 .env 中检测到 WXPUSHER_APP_TOKEN 或 WXPUSHER_UID")
+        return False
+        
+    url = "https://wxpusher.zjiecode.com/api/send/message"
+    payload = {
+        "appToken": app_token,
+        "content": f"### {title}\n\n{content}", # 支持 Markdown 格式
+        "contentType": 3, # 3 代表 Markdown 格式
+        "uids": [uid]
+    }
 
+    # 🌟 修复点 2：增加前置控制台打印，防止网络卡顿时误以为程序死锁
+    print("\n[微信推送] 正在尝试连接 WxPusher 接口，请稍候...")
+
+    try:
+        # 强制设置 timeout=5 秒，即使网络彻底断开也会在 5 秒内报错弹回，绝不卡死控制台
+        response = requests.post(url, json=payload, timeout=5)
+        res_json = response.json()
+        if res_json.get("code") == 1000:
+            logger.info("微信消息发送成功！")
+            return True
+        else:
+            logger.error("微信发送失败，接口返回: %s", response.text)
+    except Exception as e:
+        logger.error("微信发送请求异常: %s", e)
+    return False
 
 
 
@@ -1889,6 +1922,16 @@ def live_rebalance(api, target_symbol, target_weight):
         "Rebalance complete | target=%s | target_weight=%.2f%% | equity=%.2f",
         target_symbol, target_weight * 100, equity
     )
+
+    wx_title = f"🤖 QQQ Trend 调仓成功通知"
+    wx_content = (
+        f"**运行日期**: {today}\n\n"
+        f"**当前账户总资产**: ${equity:,.2f} USD\n\n"
+        f"**最新市场决策**: 买入 **{target_symbol}**\n\n"
+        f"**目标配置权重**: {target_weight * 100:.2f}%\n\n"
+        f"**提示**: 请登录 Alpaca 账户后台核对今日具体的订单成交价与滑点。"
+    )
+    send_weixin_notification(wx_title, wx_content)
 
 
 # ============================================================
