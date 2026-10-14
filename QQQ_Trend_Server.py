@@ -1887,29 +1887,29 @@ def live_rebalance(api, target_symbol, target_weight):
         target_symbol, target_weight * 100, equity
     )
 
-    # 🌟 升级：智能识别当天到底下了什么单，并写入微信
-    trade_action = "无调仓动作（维持原仓位）"
-    if 'buy_qty' in locals() and buy_qty > 0:
-        trade_action = f" 🟢 【买入 BUY】 {target_symbol} 共 {buy_qty} 股"
-    elif 'sell_qty' in locals() and sell_qty > 0:
-        trade_action = f" 🔴 【卖出 SELL】 {target_symbol} 共 {sell_qty} 股"
-    elif target_symbol == "BIL" and target_weight == 0:
-        trade_action = " ⚪ 【全仓空仓】 转换为 BIL 现金避险"
+    # # 🌟 升级：智能识别当天到底下了什么单，并写入微信
+    # trade_action = "无调仓动作（维持原仓位）"
+    # if 'buy_qty' in locals() and buy_qty > 0:
+    #     trade_action = f" 🟢 【买入 BUY】 {target_symbol} 共 {buy_qty} 股"
+    # elif 'sell_qty' in locals() and sell_qty > 0:
+    #     trade_action = f" 🔴 【卖出 SELL】 {target_symbol} 共 {sell_qty} 股"
+    # elif target_symbol == "BIL" and target_weight == 0:
+    #     trade_action = " ⚪ 【全仓空仓】 转换为 BIL 现金避险"
 
-    wx_title = f"📈 QQQ Trend 每日对账单 ({today})"
-    wx_content = (
-        f"### 🤖 量化策略执行完毕\n\n"
-        f"----------\n"
-        f"* **运行状态**: 实盘调仓成功\n"
-        f"* **当前账户总净值**: `${equity:,.2f} USD`\n"
-        f"* **策略今日核心决策**: **{target_symbol}**\n"
-        f"* **目标风险权重**: `{target_weight * 100:.2f}%`\n"
-        f"----------\n\n"
-        f"### 📊 今日账户实际流水：\n"
-        f"> **{trade_action}**\n\n"
-        f"提示：美股自动化流水线运转正常，请登录 Alpaca 后台核对成交均价。"
-    )
-    send_weixin_notification(wx_title, wx_content)
+    # wx_title = f"📈 QQQ Trend 每日对账单 ({today})"
+    # wx_content = (
+    #     f"### 🤖 量化策略执行完毕\n\n"
+    #     f"----------\n"
+    #     f"* **运行状态**: 实盘调仓成功\n"
+    #     f"* **当前账户总净值**: `${equity:,.2f} USD`\n"
+    #     f"* **策略今日核心决策**: **{target_symbol}**\n"
+    #     f"* **目标风险权重**: `{target_weight * 100:.2f}%`\n"
+    #     f"----------\n\n"
+    #     f"### 📊 今日账户实际流水：\n"
+    #     f"> **{trade_action}**\n\n"
+    #     f"提示：美股自动化流水线运转正常，请登录 Alpaca 后台核对成交均价。"
+    # )
+    # send_weixin_notification(wx_title, wx_content)
     
 
 # ============================================================
@@ -1926,6 +1926,7 @@ def get_latest_completed_date():
 
 def run_daily():
     now = datetime.now(TIMEZONE)
+    today = now.date()
     if now.weekday() >= 5:
         logger.info("Weekend detected; no trading execution.")
         return
@@ -1944,6 +1945,31 @@ def run_daily():
         live_rebalance(api, target_symbol, target)
     else:
         logger.info("No broker orders in RUN_MODE=%s", RUN_MODE)
+    
+     # 🌟 无论今天调仓是否被安全锁跳过，只要策略运行了，就【百分之百】发送微信定时对账单
+    account_equity = "未知（未连接Alpaca）"
+    if api is not None:
+        try:
+            account_equity = f"····${float(api.get_account().equity):,.2f} USD"
+        except:
+            pass
+
+    wx_title = f"📈 QQQ Trend 每日对账单 ({today})"
+    wx_content = (
+        f"### 🤖 量化策略定时运行正常\n\n"
+        f"----------\n"
+        f"* **运行状态**: 后台定时触发成功\n"
+        f"* **当前账户总净值**: `{account_equity}`\n"
+        f"* **数据最新日期**: `{latest_date.date()}`\n"
+        f"* **大盘多空信号**: **{'🟢 多头趋势 (ON)' if qqq_signal else '🔴 空头避险 (OFF)'}**\n"
+        f"* **策略今日核心决策**: **{target_symbol}**\n"
+        f"* **目标风险权重**: `{target * 100:.2f}%`\n"
+        f"----------\n\n"
+        f"提示：美股自动化流水线运转正常，若当天无信号变化或数据已处理，系统将自动维持原仓位。"
+    )
+    
+    # 强制发送微信推送
+    send_weixin_notification(wx_title, wx_content)
 
 def main():
     logger.info("QQQ Trend V2.1 server start | mode=%s | backtest=%s | base=%s", RUN_MODE, RUN_BACKTEST, BASE_DIR)
