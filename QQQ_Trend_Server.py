@@ -1929,6 +1929,8 @@ def run_daily():
     today = now.date()
     if now.weekday() >= 5:
         logger.info("Weekend detected; no trading execution.")
+        # 周末也强制发一条推送，让你安心
+        send_weixin_notification(f"☕ QQQ Trend 周末休市提醒 ({today})", "🤖 策略今天在后台准时打卡，当前是周末，美股休市中。")
         return
 
     latest_date = get_latest_completed_date()
